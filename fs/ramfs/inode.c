@@ -92,28 +92,23 @@ struct inode *ramfs_get_inode(struct super_block *sb,
 	return inode;
 }
 
+/* Necessary b/c dget is an inline only method that we need a symbol
+   access to in Rust. I read about the providing method for inlines in
+   this article https://lwn.net/Articles/829858/*/
+struct dentry *ramfs_rust_dget(struct dentry *dentry)
+{
+	return dget(dentry);
+}
+
 /*
  * File creation. Allocate an inode, and we're done..
  */
 /* SMP-safe */
-// proper way of handling this is probably (like linux) to manually read the
-// elf symbol table, but we just remove static for development purposes
-// - once finished - will not matter
-static int
-ramfs_mknod(struct user_namespace *mnt_userns, struct inode *dir,
-	    struct dentry *dentry, umode_t mode, dev_t dev)
-{
-	struct inode * inode = ramfs_get_inode(dir->i_sb, dir, mode, dev);
-	int error = -ENOSPC;
 
-	if (inode) {
-		d_instantiate(dentry, inode);
-		dget(dentry);	/* Extra count - pin the dentry in core */
-		error = 0;
-		dir->i_mtime = dir->i_ctime = current_time(dir);
-	}
-	return error;
-}
+/* proper way of handling static functions is probably
+  (like linux) to manually read the
+  elf symbol table, but we just remove static for development purposes
+  - once finished - will not matter */
 
 static int ramfs_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
 		       struct dentry *dentry, umode_t mode)

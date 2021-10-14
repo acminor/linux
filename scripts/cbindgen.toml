@@ -43,7 +43,7 @@ line_endings = "LF" # also "CR", "CRLF", "Native"
 
 ############################# Codegen Options ##################################
 
-style = "both"
+style = "tag"
 sort_by = "Name" # default for `fn.sort_by` and `const.sort_by`
 usize_is_size_t = true
 
@@ -136,7 +136,7 @@ bitflags = false
 ############## Options for How Your Rust library Should Be Parsed ##############
 
 [parse]
-parse_deps = true
+parse_deps = false
 # include = []
 exclude = []
 clean = false
