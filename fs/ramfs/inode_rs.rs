@@ -21,6 +21,8 @@ use kernel::bindings::{
     d_instantiate,
     current_time,
     fs_context,
+    S_IFREG,
+    init_user_ns
 };
 use kernel::c_types::c_int;
 
@@ -119,6 +121,14 @@ pub unsafe extern "C" fn ramfs_init_fs_context(fc: *mut fs_context) -> c_int {
         Err(_) => {
             -(kernel::bindings::ENOMEM as c_int)
         }
+    }
+}
+
+pub unsafe extern "C" fn ramfs_create(_mnt_userns: *mut user_namespace, dir: *mut inode,
+                                      dentry: *mut dentry, mode: umode_t, _excl: bool) -> c_int
+{
+    unsafe {
+        ramfs_mknod(&mut init_user_ns, dir, dentry, mode | S_IFREG as umode_t, 0)
     }
 }
 
