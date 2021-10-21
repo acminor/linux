@@ -22,7 +22,9 @@ use kernel::bindings::{
     current_time,
     fs_context,
     S_IFREG,
-    init_user_ns
+    S_IFDIR,
+    init_user_ns,
+    inc_nlink
 };
 use kernel::c_types::c_int;
 
@@ -121,6 +123,20 @@ pub unsafe extern "C" fn ramfs_init_fs_context(fc: *mut fs_context) -> c_int {
         Err(_) => {
             -(kernel::bindings::ENOMEM as c_int)
         }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ramfs_mkdir(_mnt_userns: *mut user_namespace, dir: *mut inode,
+                                     dentry: *mut dentry, mode: umode_t) -> c_int
+{
+    unsafe {
+        let retval = ramfs_mknod(&mut init_user_ns, dir, dentry, mode | S_IFDIR as umode_t, 0);
+        if retval == 0 {
+            /* increment link counter for directory (fs/inode.c) */
+            inc_nlink(dir);
+        }
+        retval
     }
 }
 

@@ -100,15 +100,6 @@ struct dentry *ramfs_rust_dget(struct dentry *dentry)
   elf symbol table, but we just remove static for development purposes
   - once finished - will not matter */
 
-static int ramfs_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
-		       struct dentry *dentry, umode_t mode)
-{
-	int retval = ramfs_mknod(&init_user_ns, dir, dentry, mode | S_IFDIR, 0);
-	if (!retval)
-		inc_nlink(dir);
-	return retval;
-}
-
 static int ramfs_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 			 struct dentry *dentry, const char *symname)
 {
