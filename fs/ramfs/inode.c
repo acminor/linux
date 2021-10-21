@@ -39,10 +39,13 @@
 #include <linux/fs_context.h>
 #include <linux/fs_parser.h>
 #include "internal.h"
+#include "inode_rs.h"
 
+/*
 struct ramfs_mount_opts {
 	umode_t mode;
 };
+*/
 
 struct ramfs_fs_info {
 	struct ramfs_mount_opts mount_opts;
@@ -93,6 +96,9 @@ struct inode *ramfs_get_inode(struct super_block *sb,
  * File creation. Allocate an inode, and we're done..
  */
 /* SMP-safe */
+// proper way of handling this is probably (like linux) to manually read the
+// elf symbol table, but we just remove static for development purposes
+// - once finished - will not matter
 static int
 ramfs_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 	    struct dentry *dentry, umode_t mode, dev_t dev)

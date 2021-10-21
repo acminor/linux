@@ -345,6 +345,19 @@ quiet_cmd_rustc_o_rs = $(RUSTC_OR_CLIPPY_QUIET) $(quiet_modtag) $@
 $(obj)/%.o: $(src)/%.rs FORCE
 	$(call if_changed_dep,rustc_o_rs)
 
+# TODO find out cargo metadata output format for cbindgen to handle kernel:: crate
+# -- for now should still work
+quiet_cmd_rustc_h_rs = CBINDGEN $(quiet_modtag) $@
+      cmd_rustc_h_rs = \
+		  cbindgen --config scripts/cbindgen.toml --output $@ $<; \
+		  echo "$@: $<" > $(depfile)
+
+$(src)/%.h: $(src)/%.rs FORCE
+	$(call if_changed_dep,rustc_h_rs)
+
+#$(src)/%.h: $(src)/%.rs FORCE
+#	cbindgen --config scripts/cbindgen.toml --output $@ $<
+
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
