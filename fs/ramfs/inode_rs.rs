@@ -124,6 +124,7 @@ pub unsafe extern "C" fn ramfs_init_fs_context(fc: *mut fs_context) -> c_int {
     }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn ramfs_create(_mnt_userns: *mut user_namespace, dir: *mut inode,
                                       dentry: *mut dentry, mode: umode_t, _excl: bool) -> c_int
 {
