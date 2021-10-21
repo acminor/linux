@@ -43,7 +43,7 @@
 
 #define RAMFS_DEFAULT_MODE	0755
 
-static const struct super_operations ramfs_ops;
+const struct super_operations ramfs_ops;
 static const struct inode_operations ramfs_dir_inode_operations;
 
 struct inode *ramfs_get_inode(struct super_block *sb,
@@ -120,18 +120,6 @@ static int ramfs_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 	return error;
 }
 
-static int ramfs_tmpfile(struct user_namespace *mnt_userns,
-			 struct inode *dir, struct dentry *dentry, umode_t mode)
-{
-	struct inode *inode;
-
-	inode = ramfs_get_inode(dir->i_sb, dir, mode, 0);
-	if (!inode)
-		return -ENOSPC;
-	d_tmpfile(dentry, inode);
-	return 0;
-}
-
 static const struct inode_operations ramfs_dir_inode_operations = {
 	.create		= ramfs_create,
 	.lookup		= simple_lookup,
@@ -157,7 +145,7 @@ static int ramfs_show_options(struct seq_file *m, struct dentry *root)
 	return 0;
 }
 
-static const struct super_operations ramfs_ops = {
+const struct super_operations ramfs_ops = {
 	.statfs		= simple_statfs,
 	.drop_inode	= generic_delete_inode,
 	.show_options	= ramfs_show_options,
@@ -200,24 +188,24 @@ static int ramfs_parse_param(struct fs_context *fc, struct fs_parameter *param)
 	return 0;
 }
 
-static int ramfs_fill_super(struct super_block *sb, struct fs_context *fc)
+loff_t ramfs_get_max_lfs_filesize(void)
 {
-	struct ramfs_fs_info *fsi = sb->s_fs_info;
-	struct inode *inode;
+	return MAX_LFS_FILESIZE;
+}
 
-	sb->s_maxbytes		= MAX_LFS_FILESIZE;
-	sb->s_blocksize		= PAGE_SIZE;
-	sb->s_blocksize_bits	= PAGE_SHIFT;
-	sb->s_magic		= RAMFS_MAGIC;
-	sb->s_op		= &ramfs_ops;
-	sb->s_time_gran		= 1;
+unsigned long ramfs_get_page_size(void)
+{
+	return PAGE_SIZE;
+}
 
-	inode = ramfs_get_inode(sb, NULL, S_IFDIR | fsi->mount_opts.mode, 0);
-	sb->s_root = d_make_root(inode);
-	if (!sb->s_root)
-		return -ENOMEM;
+unsigned char ramfs_get_page_shift(void)
+{
+	return PAGE_SHIFT;
+}
 
-	return 0;
+unsigned long ramfs_get_ramfs_magic(void)
+{
+	return RAMFS_MAGIC;
 }
 
 static int ramfs_get_tree(struct fs_context *fc)

@@ -18,15 +18,25 @@ use kernel::bindings::{
     umode_t,
     dev_t,
     super_block,
+    d_make_root,
     d_instantiate,
+    d_tmpfile,
     current_time,
     fs_context,
     S_IFREG,
     S_IFDIR,
     init_user_ns,
-    inc_nlink
+    inc_nlink,
+    ENOSPC,
+    ENOMEM,
+    super_operations,
+    loff_t,
 };
-use kernel::c_types::c_int;
+use kernel::c_types::{
+    c_int,
+    c_ulong,
+    c_uchar,
+};
 
 /*
  * Learning experience, 0755 in C is octal
@@ -50,12 +60,13 @@ mod __anon__ {
     struct inode;
     struct dentry;
     struct fs_context;
+    struct super_block;
 }
 
 #[repr(C)]
 /// Ported C ramfs_mount_opts struct
 pub struct ramfs_mount_opts {
-    mode: kernel::bindings::umode_t,
+    mode: umode_t,
 }
 
 #[repr(C)]
@@ -88,7 +99,7 @@ pub unsafe extern "C" fn ramfs_mknod(_mnt_userns: *mut user_namespace, dir: *mut
         /* type cast required b/c ENOSPC is u32 and cannot be negated by default in Rust
            - should be safe, as this is what is done in C code implicitly
              (if I know my casts correctly) */
-        -(kernel::bindings::ENOSPC as kernel::c_types::c_int)
+        -(ENOSPC as c_int)
     }
 }
 
@@ -121,7 +132,7 @@ pub unsafe extern "C" fn ramfs_init_fs_context(fc: *mut fs_context) -> c_int {
             0
         }
         Err(_) => {
-            -(kernel::bindings::ENOMEM as c_int)
+            -(ENOMEM as c_int)
         }
     }
 }
@@ -150,6 +161,53 @@ pub unsafe extern "C" fn ramfs_create(_mnt_userns: *mut user_namespace, dir: *mu
 }
 
 #[no_mangle]
+pub extern "C" fn ramfs_tmpfile(_mnt_userns: *mut user_namespace, dir: *mut inode,
+                                dentry: *mut dentry, mode: umode_t) -> c_int {
+    let inode = unsafe {
+        ramfs_get_inode((*dir).i_sb, dir, mode, 0)
+    };
+
+    /*
+     * It is interesting to see how early return C patterns are reduced
+     * to if/else return patterns in Rust, could also do early return in
+     * Rust if you wanted to.
+     */
+    if !ptr::eq(inode, ptr::null_mut()) {
+        unsafe { d_tmpfile(dentry, inode); }
+        0
+    } else {
+        -(ENOSPC as c_int)
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn ramfs_fill_super(sb: *mut super_block, _fc: *mut fs_context) -> c_int {
+    let fsi = unsafe { (*sb).s_fs_info as *mut ramfs_fs_info };
+
+    unsafe {
+        (*sb).s_maxbytes = ramfs_get_max_lfs_filesize();
+        (*sb).s_blocksize = ramfs_get_page_size();
+        (*sb).s_blocksize_bits = ramfs_get_page_shift();
+        (*sb).s_magic = ramfs_get_ramfs_magic();
+        (*sb).s_op = &ramfs_ops;
+        (*sb).s_time_gran = 1;
+    }
+
+    let inode = unsafe { ramfs_get_inode(sb, ptr::null_mut(), S_IFDIR as umode_t | (*fsi).mount_opts.mode, 0) };
+    unsafe {
+        (*sb).s_root = d_make_root(inode);
+    }
+
+    let s_root = unsafe { (*sb).s_root };
+    if ptr::eq(s_root, ptr::null_mut()) {
+        -(ENOMEM as c_int)
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
 #[allow(non_snake_case)]
 /// dummy function to make sure struct ramfs_mount_opts and ramfs_fs_info is exported
 pub extern "C" fn __dummy_rust__ramfs_fs_info(_dummy: ramfs_fs_info) {}
@@ -163,6 +221,9 @@ struct fs_context_operations {
 /// cbindgen:ignore
 extern "C" {
     static ramfs_context_ops: fs_context_operations;
+
+    #[allow(improper_ctypes)]
+    static ramfs_ops: super_operations;
 
     /* something about vm_userfaultfd_ctx causing this to fail
        - I believe this is due to that being zero-sized struct
@@ -180,4 +241,12 @@ extern "C" {
     #[allow(improper_ctypes)]
     fn ramfs_rust_fs_context_set_s_fs_info(fc: *mut fs_context,
                                            fsi: *mut ramfs_fs_info);
+    #[allow(improper_ctypes)]
+    fn ramfs_get_max_lfs_filesize() -> loff_t;
+    #[allow(improper_ctypes)]
+    fn ramfs_get_page_size() -> c_ulong;
+    #[allow(improper_ctypes)]
+    fn ramfs_get_page_shift() -> c_uchar;
+    #[allow(improper_ctypes)]
+    fn ramfs_get_ramfs_magic() -> c_ulong;
 }
