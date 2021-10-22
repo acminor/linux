@@ -6,6 +6,7 @@
 #![no_std]
 #![feature(allocator_api, global_asm, new_uninit)]
 
+#![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 #![allow(missing_docs)]
 
@@ -25,15 +26,20 @@ use kernel::bindings::{
     fs_context,
     S_IFREG,
     S_IFDIR,
-    init_user_ns,
     inc_nlink,
+    init_user_ns,
     ENOSPC,
     ENOMEM,
+    ENOPARAM,
     super_operations,
     loff_t,
+    fs_parameter_spec,
+    fs_parameter,
+    S_IALLUGO,
 };
 use kernel::c_types::{
     c_int,
+    c_uint,
     c_ulong,
     c_uchar,
 };
@@ -61,6 +67,7 @@ mod __anon__ {
     struct dentry;
     struct fs_context;
     struct super_block;
+    struct fs_parameter;
 }
 
 #[repr(C)]
@@ -101,6 +108,81 @@ pub unsafe extern "C" fn ramfs_mknod(_mnt_userns: *mut user_namespace, dir: *mut
              (if I know my casts correctly) */
         -(ENOSPC as c_int)
     }
+}
+
+/*
+ * The following should provide a version
+ * of fs_parse_result as bindgen bindings do not have
+ * a version. To my knowledge, this version should match
+ * the C-version. Relevant info on repr(C) on Rust unions
+ * and their matching of C-unions can be found here
+ * https://github.com/rust-lang/unsafe-code-guidelines/issues/13#issuecomment-417413059
+ */
+
+#[repr(C)]
+/// cbindgen:ignore
+union fs_parse_result_inner {
+    boolean: bool,
+    int_32: c_int,
+    uint_32: c_uint,
+    uint_64: u64,
+}
+
+#[repr(C)]
+/// cbindgen:ignore
+struct fs_parse_result {
+    negated: bool,
+    result: fs_parse_result_inner,
+}
+
+impl Default for fs_parse_result {
+    fn default() -> Self {
+        fs_parse_result { negated: false, result: fs_parse_result_inner { uint_64: 0 } }
+    }
+}
+
+/*
+ * Not an issue to represent this enum as
+ * a Rust enum as it is not being used to
+ * represent C flags.
+ */
+#[repr(C)]
+enum ramfs_param {
+    Opt_mode
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ramfs_parse_param(fc: *mut fs_context, param: *mut fs_parameter) -> c_int {
+    let fsi = unsafe { ramfs_rust_fs_context_get_s_fs_info(fc) };
+
+    let mut result = fs_parse_result::default();
+    let opt = unsafe { rust_fs_parse(fc, ramfs_fs_parameters.as_ptr(), param, &mut result) };
+
+    /*
+     * Match on int becaues Rust enum's are not like C enum's.
+     * - We do not want to cast the opt to the ramfs_param enum
+     *   and opt not be a valid value for ramfs_param enum.
+     */
+    let Opt_mode = ramfs_param::Opt_mode as c_int;
+    let enoparam = -(ENOPARAM as c_int);
+    match opt {
+        opt if opt == Opt_mode => {
+            unsafe {
+                (*fsi).mount_opts.mode = (result.result.uint_32 & S_IALLUGO) as umode_t;
+            }
+        }
+        /*
+		 * We might like to report bad mount options here;
+		 * but traditionally ramfs has ignored all mount options,
+		 * and as it is used as a !CONFIG_SHMEM simple substitute
+		 * for tmpfs, better continue to ignore other mount options.
+		 */
+        opt if opt == enoparam => {}
+        opt if opt < 0 => { return opt; }
+        _ => {}
+    };
+
+    0
 }
 
 #[no_mangle]
@@ -221,6 +303,7 @@ struct fs_context_operations {
 /// cbindgen:ignore
 extern "C" {
     static ramfs_context_ops: fs_context_operations;
+    static ramfs_fs_parameters: [fs_parameter_spec; 2];
 
     #[allow(improper_ctypes)]
     static ramfs_ops: super_operations;
@@ -238,6 +321,11 @@ extern "C" {
     #[allow(improper_ctypes)]
     fn ramfs_rust_fs_context_set_ops(fc: *mut fs_context,
                                      ops: *const fs_context_operations);
+    #[allow(improper_ctypes)]
+    fn rust_fs_parse(fc: *mut fs_context, desc: *const fs_parameter_spec,
+                     param: *mut fs_parameter, result: *mut fs_parse_result) -> c_int;
+    #[allow(improper_ctypes)]
+    fn ramfs_rust_fs_context_get_s_fs_info(fc: *mut fs_context) -> *mut ramfs_fs_info;
     #[allow(improper_ctypes)]
     fn ramfs_rust_fs_context_set_s_fs_info(fc: *mut fs_context,
                                            fsi: *mut ramfs_fs_info);
