@@ -329,6 +329,25 @@ pub extern "C" fn ramfs_fill_super(sb: *mut super_block, _fc: *mut fs_context) -
 }
 
 #[no_mangle]
+pub extern "C" fn ramfs_free_fc(fc: *mut fs_context)
+{
+    let fsi = unsafe { ramfs_rust_fs_context_get_s_fs_info(fc) };
+
+    /*
+     * RAII drop should be safe if fsi is valid coming from C-land
+     * - however the spec does state the following,
+     *   "For this to be safe, the memory must have been allocated
+     *    in accordance with the memory layout used by Box."
+     *    - https://doc.rust-lang.org/std/boxed/struct.Box.html#method.from_raw
+     *    - this should be fine because we define this struct as C-typed
+     * - also could have an issue with it being allocated with different settings
+     *   than the default allocator we have. However, we do not have to use from_raw_into
+     *   because kfree can handle the different kmalloc memtypes just fine :)
+     */
+    unsafe { Box::from_raw(fsi); }
+}
+
+#[no_mangle]
 #[allow(non_snake_case)]
 /// dummy function to make sure struct ramfs_mount_opts and ramfs_fs_info is exported
 pub extern "C" fn __dummy_rust__ramfs_fs_info(_dummy: ramfs_fs_info) {}

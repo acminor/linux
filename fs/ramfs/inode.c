@@ -171,11 +171,6 @@ static int ramfs_get_tree(struct fs_context *fc)
 	return get_tree_nodev(fc, ramfs_fill_super);
 }
 
-static void ramfs_free_fc(struct fs_context *fc)
-{
-	kfree(fc->s_fs_info);
-}
-
 const struct fs_context_operations ramfs_context_ops = {
 	.free		= ramfs_free_fc,
 	.parse_param	= ramfs_parse_param,
