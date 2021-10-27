@@ -209,12 +209,6 @@ void ramfs_rust_fs_context_set_s_fs_info(struct fs_context *fc,
 	fc->s_fs_info = fsi;
 }
 
-static void ramfs_kill_sb(struct super_block *sb)
-{
-	kfree(sb->s_fs_info);
-	kill_litter_super(sb);
-}
-
 static struct file_system_type ramfs_fs_type = {
 	.name		= "ramfs",
 	.init_fs_context = ramfs_init_fs_context,

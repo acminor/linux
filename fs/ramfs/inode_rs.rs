@@ -41,6 +41,7 @@ use kernel::bindings::{
     strlen,
     iput,
     page_symlink,
+    kill_litter_super,
 };
 use kernel::c_types::{
     c_int,
@@ -301,6 +302,11 @@ pub extern "C" fn ramfs_tmpfile(_mnt_userns: *mut user_namespace, dir: *mut inod
     }
 }
 
+#[no_mangle]
+pub extern "C" fn ramfs_kill_sb(sb: *mut super_block) {
+    unsafe { Box::from_raw((*sb).s_fs_info as *mut ramfs_fs_info); }
+    unsafe { kill_litter_super(sb); }
+}
 
 #[no_mangle]
 pub extern "C" fn ramfs_fill_super(sb: *mut super_block, _fc: *mut fs_context) -> c_int {
