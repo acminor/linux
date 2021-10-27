@@ -90,35 +90,10 @@ struct dentry *ramfs_rust_dget(struct dentry *dentry)
 	return dget(dentry);
 }
 
-/*
- * File creation. Allocate an inode, and we're done..
- */
-/* SMP-safe */
-
 /* proper way of handling static functions is probably
   (like linux) to manually read the
   elf symbol table, but we just remove static for development purposes
   - once finished - will not matter */
-
-static int ramfs_symlink(struct user_namespace *mnt_userns, struct inode *dir,
-			 struct dentry *dentry, const char *symname)
-{
-	struct inode *inode;
-	int error = -ENOSPC;
-
-	inode = ramfs_get_inode(dir->i_sb, dir, S_IFLNK|S_IRWXUGO, 0);
-	if (inode) {
-		int l = strlen(symname)+1;
-		error = page_symlink(inode, symname, l);
-		if (!error) {
-			d_instantiate(dentry, inode);
-			dget(dentry);
-			dir->i_mtime = dir->i_ctime = current_time(dir);
-		} else
-			iput(inode);
-	}
-	return error;
-}
 
 static const struct inode_operations ramfs_dir_inode_operations = {
 	.create		= ramfs_create,

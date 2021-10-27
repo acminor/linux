@@ -36,12 +36,18 @@ use kernel::bindings::{
     fs_parameter_spec,
     fs_parameter,
     S_IALLUGO,
+    S_IFLNK,
+    S_IRWXUGO,
+    strlen,
+    iput,
+    page_symlink,
 };
 use kernel::c_types::{
     c_int,
     c_uint,
     c_ulong,
     c_uchar,
+    c_char,
 };
 
 /*
@@ -239,6 +245,39 @@ pub unsafe extern "C" fn ramfs_create(_mnt_userns: *mut user_namespace, dir: *mu
 {
     unsafe {
         ramfs_mknod(&mut init_user_ns, dir, dentry, mode | S_IFREG as umode_t, 0)
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ramfs_symlink(_mnt_userns: *mut user_namespace, dir: *mut inode,
+                                       dentry: *mut dentry, symname: *const c_char) -> c_int
+{
+    let inode = unsafe {
+        ramfs_get_inode((*dir).i_sb, dir, (S_IFLNK | S_IRWXUGO) as umode_t, 0)
+    };
+    if ptr::eq(inode, ptr::null_mut()) {
+        return -(ENOSPC as c_int);
+    }
+    
+    /* Grab symbol name length and attempt linkage. On linkage failure, we'll
+       iput(inode) to decrement the usage count, ultimately destroying it. */
+    let l = unsafe { strlen(symname) } + 1;
+    let err = unsafe { page_symlink(inode, symname, l as c_int) };
+    if err != 0 {
+        unsafe { iput(inode) };
+        err
+    } else {
+        /* On successful linkage, we'll instantiate, increment the reference
+        count, and update the inode's modification time. */
+        unsafe {
+            d_instantiate(dentry, inode);
+            ramfs_rust_dget(dentry);
+    
+            let ct = current_time(dir);
+            (*dir).i_mtime = ct;
+            (*dir).i_ctime = ct;
+        }
+        0
     }
 }
 
