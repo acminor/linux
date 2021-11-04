@@ -108,18 +108,6 @@ static const struct inode_operations ramfs_dir_inode_operations = {
 	.tmpfile	= ramfs_tmpfile,
 };
 
-/*
- * Display the mount options in /proc/mounts.
- */
-static int ramfs_show_options(struct seq_file *m, struct dentry *root)
-{
-	struct ramfs_fs_info *fsi = root->d_sb->s_fs_info;
-
-	if (fsi->mount_opts.mode != RAMFS_DEFAULT_MODE)
-		seq_printf(m, ",mode=%o", fsi->mount_opts.mode);
-	return 0;
-}
-
 const struct super_operations ramfs_ops = {
 	.statfs		= simple_statfs,
 	.drop_inode	= generic_delete_inode,
@@ -207,6 +195,15 @@ void ramfs_rust_fs_context_set_s_fs_info(struct fs_context *fc,
 					 struct ramfs_fs_info *fsi)
 {
 	fc->s_fs_info = fsi;
+}
+
+/*
+ * Presently, we're not exporting seq_printf(). For now use this simple wrapper
+ * function to invoke seq_printf() with a single given char* and the mode value.
+ */
+void ramfs_rust_seq_puts_mode(struct seq_file* m, const char* string, umode_t mode)
+{
+    seq_printf(m, string, mode);
 }
 
 static struct file_system_type ramfs_fs_type = {

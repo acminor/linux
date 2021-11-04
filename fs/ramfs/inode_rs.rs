@@ -12,6 +12,7 @@
 
 use core::ptr;
 use kernel::prelude::*;
+use kernel::c_str;
 use kernel::bindings::{
     user_namespace,
     inode,
@@ -42,6 +43,7 @@ use kernel::bindings::{
     iput,
     page_symlink,
     kill_litter_super,
+    seq_file,
 };
 use kernel::c_types::{
     c_int,
@@ -68,6 +70,7 @@ const RAMFS_DEFAULT_MODE: umode_t = 0o755;
      name on export. Plus, Rust (which understands module namespacing) reads the correct one
      from kernel and not from our fake module.*/
 #[allow(unused)]
+#[rustfmt::skip]
 mod __anon__ {
     struct user_namespace;
     struct inode;
@@ -75,6 +78,7 @@ mod __anon__ {
     struct fs_context;
     struct super_block;
     struct fs_parameter;
+    struct seq_file;
 }
 
 #[repr(C)]
@@ -303,6 +307,22 @@ pub extern "C" fn ramfs_tmpfile(_mnt_userns: *mut user_namespace, dir: *mut inod
 }
 
 #[no_mangle]
+pub extern "C" fn ramfs_show_options(m: *mut seq_file, root: *mut dentry) -> c_int
+{
+    let sb = unsafe { (*root).d_sb };
+    let fsi = unsafe { (*sb).s_fs_info as *mut ramfs_fs_info };
+    let mode = unsafe { (*fsi).mount_opts.mode };
+    if mode != RAMFS_DEFAULT_MODE {
+        /* Invoke our C-wrapper for seq_printf().
+           (We're not exporting seq_printf() yet) */
+        unsafe {
+            ramfs_rust_seq_puts_mode(m, c_str!(",mode=%o").as_char_ptr(), mode);
+        }
+    }
+    0
+}
+
+#[no_mangle]
 pub extern "C" fn ramfs_kill_sb(sb: *mut super_block) {
     unsafe { Box::from_raw((*sb).s_fs_info as *mut ramfs_fs_info); }
     unsafe { kill_litter_super(sb); }
@@ -393,6 +413,8 @@ extern "C" {
     #[allow(improper_ctypes)]
     fn ramfs_rust_fs_context_set_s_fs_info(fc: *mut fs_context,
                                            fsi: *mut ramfs_fs_info);
+    #[allow(improper_ctypes)]
+    fn ramfs_rust_seq_puts_mode(m: *mut seq_file, string: *const c_char, mode: umode_t);
     #[allow(improper_ctypes)]
     fn ramfs_get_max_lfs_filesize() -> loff_t;
     #[allow(improper_ctypes)]
