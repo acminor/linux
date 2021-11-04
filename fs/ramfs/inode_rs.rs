@@ -263,7 +263,7 @@ pub unsafe extern "C" fn ramfs_symlink(_mnt_userns: *mut user_namespace, dir: *m
     if ptr::eq(inode, ptr::null_mut()) {
         return -(ENOSPC as c_int);
     }
-    
+
     /* Grab symbol name length and attempt linkage. On linkage failure, we'll
        iput(inode) to decrement the usage count, ultimately destroying it. */
     let l = unsafe { strlen(symname) } + 1;
@@ -277,7 +277,7 @@ pub unsafe extern "C" fn ramfs_symlink(_mnt_userns: *mut user_namespace, dir: *m
         unsafe {
             d_instantiate(dentry, inode);
             ramfs_rust_dget(dentry);
-    
+
             let ct = current_time(dir);
             (*dir).i_mtime = ct;
             (*dir).i_ctime = ct;
