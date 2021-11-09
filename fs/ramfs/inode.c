@@ -154,9 +154,10 @@ unsigned long ramfs_get_ramfs_magic(void)
 	return RAMFS_MAGIC;
 }
 
-static int ramfs_get_tree(struct fs_context *fc)
+int ramfs_rust_get_tree_nodev(struct fs_context* fc,
+            int (*fill_super)(struct super_block *sb, struct fs_context *fc))
 {
-	return get_tree_nodev(fc, ramfs_fill_super);
+    return get_tree_nodev(fc, fill_super);
 }
 
 const struct fs_context_operations ramfs_context_ops = {

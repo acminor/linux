@@ -355,6 +355,12 @@ pub extern "C" fn ramfs_fill_super(sb: *mut super_block, _fc: *mut fs_context) -
 }
 
 #[no_mangle]
+pub extern "C" fn ramfs_get_tree(fc: *mut fs_context) -> c_int
+{
+    unsafe { ramfs_rust_get_tree_nodev(fc, ramfs_fill_super) }
+}
+
+#[no_mangle]
 pub extern "C" fn ramfs_free_fc(fc: *mut fs_context)
 {
     let fsi = unsafe { ramfs_rust_fs_context_get_s_fs_info(fc) };
@@ -423,4 +429,7 @@ extern "C" {
     fn ramfs_get_page_shift() -> c_uchar;
     #[allow(improper_ctypes)]
     fn ramfs_get_ramfs_magic() -> c_ulong;
+    #[allow(improper_ctypes)]
+    fn ramfs_rust_get_tree_nodev(fc: *mut fs_context,
+                                 fill_super: extern "C" fn(*mut super_block, *mut fs_context) -> c_int) -> c_int;
 }
