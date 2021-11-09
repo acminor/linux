@@ -31,29 +31,6 @@
 
 #include "internal.h"
 
-// Need to remove static so that Rust can pick on this as an extern symbol
-// - will be a non-issue once moved to Rust, we will just not extern "C"
-//   this function (and also not make it public)
-unsigned long ramfs_mmu_get_unmapped_area(struct file *file,
-		unsigned long addr, unsigned long len, unsigned long pgoff,
-		unsigned long flags)
-{
-	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
-}
-
-/*
-const struct file_operations ramfs_file_operations = {
-	.read_iter	= generic_file_read_iter,
-	.write_iter	= generic_file_write_iter,
-	.mmap		= generic_file_mmap,
-	.fsync		= noop_fsync,
-	.splice_read	= generic_file_splice_read,
-	.splice_write	= iter_file_splice_write,
-	.llseek		= generic_file_llseek,
-	.get_unmapped_area	= ramfs_mmu_get_unmapped_area,
-};
-*/
-
 const struct inode_operations ramfs_file_inode_operations = {
 	.setattr	= simple_setattr,
 	.getattr	= simple_getattr,

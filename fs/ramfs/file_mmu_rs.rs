@@ -4,29 +4,11 @@
 use kernel::prelude::*;
 
 use kernel::bindings::{
-    file_operations,
-    generic_file_read_iter,
-    generic_file_write_iter,
-    generic_file_mmap,
-    noop_fsync,
-    generic_file_splice_read,
-    iter_file_splice_write,
-    generic_file_llseek,
-
+    file, file_operations, generic_file_llseek, generic_file_mmap, generic_file_read_iter,
+    generic_file_splice_read, generic_file_write_iter, iter_file_splice_write, noop_fsync,
 };
-
-/*
-const struct file_operations ramfs_file_operations = {
-.read_iter	= generic_file_read_iter,
-.write_iter	= generic_file_write_iter,
-.mmap		= generic_file_mmap,
-.fsync		= noop_fsync,
-.splice_read	= generic_file_splice_read,
-.splice_write	= iter_file_splice_write,
-.llseek		= generic_file_llseek,
-.get_unmapped_area	= ramfs_mmu_get_unmapped_area,
-};
-*/
+use kernel::c_types::c_ulong;
+use kernel::task::Task;
 
 #[no_mangle]
 pub static mut ramfs_file_operations: file_operations = file_operations {
@@ -69,8 +51,26 @@ pub static mut ramfs_file_operations: file_operations = file_operations {
     fadvise: None,
 };
 
-extern "C" {
-    pub fn ramfs_mmu_get_unmapped_area(file: *mut kernel::bindings::file,
-            addr: kernel::c_types::c_ulong, len: kernel::c_types::c_ulong, pgoff: kernel::c_types::c_ulong,
-            flags: kernel::c_types::c_ulong) -> kernel::c_types::c_ulong;
+#[no_mangle]
+pub unsafe extern "C" fn ramfs_mmu_get_unmapped_area(
+    file: *mut file,
+    addr: c_ulong,
+    len: c_ulong,
+    pgoff: c_ulong,
+    flags: c_ulong,
+) -> c_ulong {
+    // could potentially fix this __bindgen_anon_1 with a C-preprocessor
+    // definition that is only set during C-bindgen
+    //
+    // Without this we are blocked by https://github.com/rust-lang/rust-bindgen/issues/1971
+    // and https://github.com/rust-lang/rust-bindgen/issues/2000 in-terms of getting better names from bindgen.
+    //
+    // Luckily their is only one outer anonymous struct used for struct layout randomization
+    // `__randomize_layout`, TODO not sure how Rust-for-Linux handles this here and in task_struct
+    //
+    // Safety: original ramfs code assumed that mm was not null, we do the same here
+    let mm = unsafe { Task::current().as_task_ptr().mm.as_ref().unwrap() };
+    let get_unmapped_area = mm.__bindgen_anon_1.get_unmapped_area.unwrap();
+
+    unsafe { get_unmapped_area(file, addr, len, pgoff, flags) }
 }

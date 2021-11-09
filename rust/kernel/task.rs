@@ -108,6 +108,12 @@ impl Task {
         // SAFETY: By the type invariant, we know that `self.ptr` is non-null and valid.
         unsafe { bindings::signal_pending(self.ptr) != 0 }
     }
+
+    /// Returns a reference to the underlying task_struct.
+    pub fn as_task_ptr(&self) -> &bindings::task_struct {
+        // SAFETY: By the type invariant, we know that `self.ptr` is non-null and valid.
+        unsafe { self.ptr.as_ref().unwrap() }
+    }
 }
 
 impl PartialEq for Task {
