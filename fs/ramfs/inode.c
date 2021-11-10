@@ -44,42 +44,21 @@
 #define RAMFS_DEFAULT_MODE	0755
 
 const struct super_operations ramfs_ops;
-static const struct inode_operations ramfs_dir_inode_operations;
+const struct inode_operations ramfs_dir_inode_operations;
 
-struct inode *ramfs_get_inode(struct super_block *sb,
-				const struct inode *dir, umode_t mode, dev_t dev)
+void ramfs_mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 {
-	struct inode * inode = new_inode(sb);
+	mapping_set_gfp_mask(m, mask);
+}
 
-	if (inode) {
-		inode->i_ino = get_next_ino();
-		inode_init_owner(&init_user_ns, inode, dir, mode);
-		inode->i_mapping->a_ops = &ram_aops;
-		mapping_set_gfp_mask(inode->i_mapping, GFP_HIGHUSER);
-		mapping_set_unevictable(inode->i_mapping);
-		inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
-		switch (mode & S_IFMT) {
-		default:
-			init_special_inode(inode, mode, dev);
-			break;
-		case S_IFREG:
-			inode->i_op = &ramfs_file_inode_operations;
-			inode->i_fop = &ramfs_file_operations;
-			break;
-		case S_IFDIR:
-			inode->i_op = &ramfs_dir_inode_operations;
-			inode->i_fop = &simple_dir_operations;
+void ramfs_mapping_set_unevictable(struct address_space *mapping)
+{
+	mapping_set_unevictable(mapping);
+}
 
-			/* directory inodes start off with i_nlink == 2 (for "." entry) */
-			inc_nlink(inode);
-			break;
-		case S_IFLNK:
-			inode->i_op = &page_symlink_inode_operations;
-			inode_nohighmem(inode);
-			break;
-		}
-	}
-	return inode;
+gfp_t ramfs_get_gfp_highuser(void)
+{
+  return GFP_HIGHUSER;
 }
 
 /* Necessary b/c dget is an inline only method that we need a symbol
@@ -95,7 +74,7 @@ struct dentry *ramfs_rust_dget(struct dentry *dentry)
   elf symbol table, but we just remove static for development purposes
   - once finished - will not matter */
 
-static const struct inode_operations ramfs_dir_inode_operations = {
+const struct inode_operations ramfs_dir_inode_operations = {
 	.create		= ramfs_create,
 	.lookup		= simple_lookup,
 	.link		= simple_link,

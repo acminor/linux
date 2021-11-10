@@ -44,6 +44,19 @@ use kernel::bindings::{
     page_symlink,
     kill_litter_super,
     seq_file,
+    get_next_ino,
+    inode_init_owner,
+    init_special_inode,
+    inode_nohighmem,
+    address_space,
+    gfp_t,
+    S_IFMT,
+    simple_dir_operations,
+    page_symlink_inode_operations,
+    inode_operations,
+    ram_aops,
+    file_operations,
+    new_inode,
 };
 use kernel::c_types::{
     c_int,
@@ -91,6 +104,49 @@ pub struct ramfs_mount_opts {
 /// Ported C ramfs_fs_info struct
 pub struct ramfs_fs_info {
     mount_opts: ramfs_mount_opts,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ramfs_get_inode(sb: *mut super_block, dir: *const inode,
+                                         mode: umode_t, dev: dev_t) -> *mut inode {
+    let inode = unsafe { new_inode(sb) };
+
+    if !ptr::eq(inode, ptr::null_mut()) {
+        let inode = unsafe{ inode.as_mut().unwrap() };
+        inode.i_ino = unsafe{ get_next_ino() } as c_ulong;
+        unsafe { inode_init_owner(&mut init_user_ns, inode, dir, mode); }
+        unsafe { inode.i_mapping.as_mut().unwrap().a_ops = &ram_aops; }
+        unsafe { ramfs_mapping_set_gfp_mask(inode.i_mapping, ramfs_get_gfp_highuser()); }
+        unsafe { ramfs_mapping_set_unevictable(inode.i_mapping); }
+
+        let cur_time = unsafe{ current_time(inode) };
+        inode.i_atime = cur_time;
+        inode.i_mtime = cur_time;
+        inode.i_ctime = cur_time;
+
+        match mode as c_uint & S_IFMT {
+            S_IFREG => {
+                inode.i_op = unsafe { &ramfs_file_inode_operations };
+                inode.__bindgen_anon_3.i_fop = unsafe { &ramfs_file_operations };
+            }
+            S_IFDIR => {
+                inode.i_op = unsafe { &ramfs_dir_inode_operations };
+                inode.__bindgen_anon_3.i_fop = unsafe { &simple_dir_operations };
+
+                /* directory inodes start off with i_nlink == 2 (for "." entry) */
+                unsafe{ inc_nlink(inode); }
+            }
+            S_IFLNK => {
+                inode.i_op = unsafe { &page_symlink_inode_operations };
+                unsafe { inode_nohighmem(inode); }
+            }
+            _ => {
+                unsafe { init_special_inode(inode, mode, dev); }
+            }
+        }
+    }
+
+    inode
 }
 
 #[no_mangle]
@@ -394,16 +450,18 @@ struct fs_context_operations {
 extern "C" {
     static ramfs_context_ops: fs_context_operations;
     static ramfs_fs_parameters: [fs_parameter_spec; 2];
+    static ramfs_file_operations: file_operations;
+    static ramfs_file_inode_operations: inode_operations;
+    static ramfs_dir_inode_operations: inode_operations;
 
     #[allow(improper_ctypes)]
     static ramfs_ops: super_operations;
 
-    /* something about vm_userfaultfd_ctx causing this to fail
-       - I believe this is due to that being zero-sized struct
-         but it is repr(C) in the bindings_generated.rs file
-         so not sure. For now, I assume that is is safe to ignore */
-    #[allow(improper_ctypes)]
-    fn ramfs_get_inode(sb: *mut super_block, dir: *const inode, mode: umode_t, dev: dev_t) -> *mut inode;
+    /* NOTE allow(improper_ctypes)
+    something about vm_userfaultfd_ctx causing this to fail
+    - I believe this is due to that being zero-sized struct
+    but it is repr(C) in the bindings_generated.rs file
+    so not sure. For now, I assume that is is safe to ignore */
 
     #[allow(improper_ctypes)]
     fn ramfs_rust_dget(dentry: *mut dentry) -> *mut dentry;
@@ -432,4 +490,10 @@ extern "C" {
     #[allow(improper_ctypes)]
     fn ramfs_rust_get_tree_nodev(fc: *mut fs_context,
                                  fill_super: extern "C" fn(*mut super_block, *mut fs_context) -> c_int) -> c_int;
+    #[allow(improper_ctypes)]
+    fn ramfs_mapping_set_gfp_mask(m: *mut address_space, mask: gfp_t);
+    #[allow(improper_ctypes)]
+    fn ramfs_mapping_set_unevictable(mapping: *mut address_space);
+    #[allow(improper_ctypes)]
+    fn ramfs_get_gfp_highuser() -> gfp_t;
 }
