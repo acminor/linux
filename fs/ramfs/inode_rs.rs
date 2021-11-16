@@ -44,6 +44,8 @@ use kernel::bindings::{
     page_symlink,
     kill_litter_super,
     seq_file,
+    register_filesystem,
+    file_system_type,
     get_next_ino,
     inode_init_owner,
     init_special_inode,
@@ -57,6 +59,8 @@ use kernel::bindings::{
     ram_aops,
     file_operations,
     new_inode,
+    lock_class_key,
+    hlist_head
 };
 use kernel::c_types::{
     c_int,
@@ -71,6 +75,13 @@ use kernel::c_types::{
  * so we need to prefix 755 in Rust with 0o755
  */
 const RAMFS_DEFAULT_MODE: umode_t = 0o755;
+
+/* The original FS_USERNS_MOUNT is a macro defined in include/linux/fs.h.
+ * We need this definition in order to initialize the 'ramfs_fs_type' struct
+ * in this file as compile-time. Since Rust cannot see C macros, this is our
+ * best current solution.
+ */
+const RAMFS_RUST_FS_USERNS_MOUNT: c_int = 8;
 
 /* Predeclaration as required by cbindgen. Without this, cbindgen
    would not know what type of variable these are as we do not have
@@ -92,6 +103,7 @@ mod __anon__ {
     struct super_block;
     struct fs_parameter;
     struct seq_file;
+    struct file_system_type;
 }
 
 #[repr(C)]
@@ -433,6 +445,53 @@ pub extern "C" fn ramfs_free_fc(fc: *mut fs_context)
      *   because kfree can handle the different kmalloc memtypes just fine :)
      */
     unsafe { Box::from_raw(fsi); }
+}
+
+#[no_mangle]
+pub static mut ramfs_fs_type: file_system_type = file_system_type {
+    name: c_str!("ramfs").as_char_ptr(),
+    init_fs_context: Some(ramfs_init_fs_context),
+    parameters: unsafe{ ramfs_fs_parameters.as_ptr() },
+    kill_sb: Some(ramfs_kill_sb),
+    fs_flags: RAMFS_RUST_FS_USERNS_MOUNT,
+    mount: None,
+    owner: ptr::null_mut(),
+    next: ptr::null_mut(),
+    fs_supers: hlist_head { first: ptr::null_mut() },
+    s_lock_key: lock_class_key {},
+    s_umount_key: lock_class_key {},
+    s_vfs_rename_key: lock_class_key {},
+    s_writers_key: [ lock_class_key {}; 3 ],
+    i_lock_key: lock_class_key {},
+    i_mutex_key: lock_class_key {},
+    i_mutex_dir_key: lock_class_key {},
+};
+
+/* The original C source uses the '__init' macro (defined in include/linux/init.h)
+ * to apply a few attributes to this init function. '__init' expands to:
+ *      __section(".init.text") __cold  __latent_entropy __noinitretpoline __nocfi
+ * We can replicate these modifiers with Rust attributes:
+ *      __section(".init.text")     -->     link_section
+ *      __cold                      -->     cold
+ *      __latent_entropy            -->     (NOT AVAILABLE FOR RUST COMPILER)
+ *      __noinitretpoline           -->     (NOT AVAILABLE FOR RUST COMPILER)
+ *      __nocfi                     -->     N/A (see below)
+ * A few of these don't have rustc equivalents, so we can't perfectly recreate
+ * how this function is compiled. Despite this, our kernel compiles and our
+ * ramfs seem to have no issues. We'll leave this issue to future research.
+ * __nocfi disables a Clang Control Flow Integrity feature. We shouldn't need
+ * to worry about it in our Rust code (we're not using Clang, we're using rustc).
+ * Sources:
+ *  - https://doc.rust-lang.org/reference/abi.html#the-link_section-attribute
+ *  - https://doc.rust-lang.org/reference/attributes/codegen.html#the-cold-attribute
+ *  - https://clang.llvm.org/docs/ControlFlowIntegrity.html
+ */
+#[no_mangle]
+#[link_section = ".init.text"]  /* __section(".init.text") */
+#[cold]                         /* __cold */
+pub extern "C" fn init_ramfs_fs() -> c_int
+{
+    unsafe { register_filesystem(&mut ramfs_fs_type) }
 }
 
 #[no_mangle]

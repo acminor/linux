@@ -186,16 +186,4 @@ void ramfs_rust_seq_puts_mode(struct seq_file* m, const char* string, umode_t mo
     seq_printf(m, string, mode);
 }
 
-static struct file_system_type ramfs_fs_type = {
-	.name		= "ramfs",
-	.init_fs_context = ramfs_init_fs_context,
-	.parameters	= ramfs_fs_parameters,
-	.kill_sb	= ramfs_kill_sb,
-	.fs_flags	= FS_USERNS_MOUNT,
-};
-
-static int __init init_ramfs_fs(void)
-{
-	return register_filesystem(&ramfs_fs_type);
-}
 fs_initcall(init_ramfs_fs);
