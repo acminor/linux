@@ -3,6 +3,7 @@
 #include <linux/cdev.h>
 #include <linux/errname.h>
 #include <linux/fs.h>
+#include <linux/fs_parser.h>
 #include <linux/module.h>
 #include <linux/random.h>
 #include <linux/slab.h>

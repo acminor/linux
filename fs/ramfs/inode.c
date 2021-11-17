@@ -43,9 +43,6 @@
 
 #define RAMFS_DEFAULT_MODE	0755
 
-const struct super_operations ramfs_ops;
-const struct inode_operations ramfs_dir_inode_operations;
-
 void ramfs_mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 {
 	mapping_set_gfp_mask(m, mask);
@@ -73,34 +70,6 @@ struct dentry *ramfs_rust_dget(struct dentry *dentry)
   (like linux) to manually read the
   elf symbol table, but we just remove static for development purposes
   - once finished - will not matter */
-
-const struct inode_operations ramfs_dir_inode_operations = {
-	.create		= ramfs_create,
-	.lookup		= simple_lookup,
-	.link		= simple_link,
-	.unlink		= simple_unlink,
-	.symlink	= ramfs_symlink,
-	.mkdir		= ramfs_mkdir,
-	.rmdir		= simple_rmdir,
-	.mknod		= ramfs_mknod,
-	.rename		= simple_rename,
-	.tmpfile	= ramfs_tmpfile,
-};
-
-const struct super_operations ramfs_ops = {
-	.statfs		= simple_statfs,
-	.drop_inode	= generic_delete_inode,
-	.show_options	= ramfs_show_options,
-};
-
-enum ramfs_param {
-	Opt_mode,
-};
-
-const struct fs_parameter_spec ramfs_fs_parameters[] = {
-	fsparam_u32oct("mode",	Opt_mode),
-	{}
-};
 
 /* Necessary b/c fs_parse is an inline method that we need a symbol
    access to in Rust. I read about the providing method for inlines in
@@ -139,6 +108,7 @@ int ramfs_rust_get_tree_nodev(struct fs_context* fc,
     return get_tree_nodev(fc, fill_super);
 }
 
+// cannot convert until we generate more bindings
 const struct fs_context_operations ramfs_context_ops = {
 	.free		= ramfs_free_fc,
 	.parse_param	= ramfs_parse_param,

@@ -48,6 +48,7 @@ pub mod cred;
 pub mod device;
 pub mod driver;
 mod error;
+pub mod file_system;
 pub mod file;
 pub mod file_operations;
 pub mod gpio;
@@ -240,6 +241,58 @@ macro_rules! container_of {
         let ptr = $ptr as *const _ as *const u8;
         let offset = $crate::offset_of!($type, $($f)*);
         ptr.wrapping_offset(-offset) as *const $type
+    }}
+}
+
+/// Compile-time version of ::core::mem::zeroed
+/// - Currently, this cannot be a function as const-generics are
+///   still a work in progress.
+///
+/// # Safety
+///
+/// Uses ::core::mem::transmute for additional memory safety. This
+/// at least gets us a size check on the non-heap array being created.
+///
+/// The type being constructed should be valid if zeroed.
+#[macro_export]
+macro_rules! const_zeroed {
+    ($type:ty) => {{
+        unsafe { ::core::mem::transmute([0u8; ::core::mem::size_of::<$type>()]) }
+    }}
+}
+
+/// Creates a C-style default non-heaped struct (zeroed).
+/// - This is a wrapper around const_zeroed!().
+/// - This is necessary when creating static objects in Rust
+///   as they are expected to be done at compile time. The default
+///   implementation for ::core::mem::zeroed and the trait Default
+///   are not const so they cannot be used in creating static objects.
+///
+/// # Safety
+///
+/// See notes on const_zeroed.
+///
+/// # Example
+/// ```
+/// # use kernel::prelude::*;
+/// # use kernel::c_default_struct;
+/// struct Test {
+///     a: u64,
+///     b: u32,
+/// }
+///
+/// fn test() {
+///     let test = Test { a: 10, b: 20 };
+///     let change_one_copy = Test {
+///         a: 11,
+///         ..c_default_struct!(Test)
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! c_default_struct {
+    ($type:ty) => {{
+        $crate::const_zeroed!($type)
     }}
 }
 

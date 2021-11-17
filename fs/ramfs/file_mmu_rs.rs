@@ -1,12 +1,37 @@
+/*! file_mmu.rs: ramfs MMU-based file operations
+ * - ported from file-mmu.c
+ *
+ * Resizable simple ram filesystem for Linux.
+ *
+ * Copyright (C) 2000 Linus Torvalds.
+ *               2000 Transmeta Corp.
+ *
+ * Usage limits added by David Gibson, Linuxcare Australia.
+ * This file is released under the GPL.
+ *
+ * NOTE! This filesystem is probably most useful
+ * not as a real filesystem, but as an example of
+ * how virtual filesystems can be written.
+ *
+ * It doesn't get much simpler than this. Consider
+ * that this file implements the full semantics of
+ * a POSIX-compliant read-write filesystem.
+ *
+ * Note in particular how the filesystem does not
+ * need to implement any data structures of its own
+ * to keep track of the virtual data: using the VFS
+ * caches is sufficient.
+ */
+
 #![no_std]
 #![feature(allocator_api, global_asm)]
+#![allow(missing_docs)]
 
-use kernel::prelude::*;
-
-use kernel::bindings::{
-    file, file_operations, generic_file_llseek, generic_file_mmap, generic_file_read_iter,
-    generic_file_splice_read, generic_file_write_iter, iter_file_splice_write, noop_fsync,
-};
+use kernel::c_default_struct;
+use kernel::bindings::{file, file_operations, generic_file_llseek, generic_file_mmap,
+                       generic_file_read_iter, generic_file_splice_read, generic_file_write_iter,
+                       inode_operations, iter_file_splice_write, noop_fsync, simple_getattr,
+                       simple_setattr};
 use kernel::c_types::c_ulong;
 use kernel::task::Task;
 
@@ -20,35 +45,14 @@ pub static mut ramfs_file_operations: file_operations = file_operations {
     splice_write: Some(iter_file_splice_write),
     llseek: Some(generic_file_llseek),
     get_unmapped_area: Some(ramfs_mmu_get_unmapped_area),
-    // To my knowledge must list these manually because
-    // Default::default is not compile time able
-    // so cannot do ..Default::default as I have seen on StackOverflow
-    read: None,
-    write: None,
-    iopoll: None,
-    iterate: None,
-    iterate_shared: None,
-    poll: None,
-    unlocked_ioctl: None,
-    compat_ioctl: None,
-    mmap_supported_flags: 0,
-    open: None,
-    flush: None,
-    release: None,
-    fasync: None,
-    owner: core::ptr::null_mut(),
-    lock: None,
-    sendpage: None,
-    check_flags: None,
-    flock: None,
-    setlease: None,
-    fallocate: None,
-    show_fdinfo: None,
-    #[cfg(not(CONFIG_MMU))]
-    mmap_capabilities: None,
-    copy_file_range: None,
-    remap_file_range: None,
-    fadvise: None,
+    ..c_default_struct!(file_operations)
+};
+
+#[no_mangle]
+pub static ramfs_file_inode_operations: inode_operations = inode_operations {
+    setattr: Some(simple_setattr),
+    getattr: Some(simple_getattr),
+    ..c_default_struct!(inode_operations)
 };
 
 #[no_mangle]

@@ -9,10 +9,15 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 #![allow(missing_docs)]
+#![allow(non_upper_case_globals)]
 
 use core::ptr;
 use kernel::prelude::*;
-use kernel::c_str;
+use kernel::{
+    c_str,
+    fsparam_u32oct,
+    c_default_struct,
+};
 use kernel::bindings::{
     user_namespace,
     inode,
@@ -59,8 +64,13 @@ use kernel::bindings::{
     ram_aops,
     file_operations,
     new_inode,
-    lock_class_key,
-    hlist_head
+    generic_delete_inode,
+    simple_link,
+    simple_lookup,
+    simple_rename,
+    simple_rmdir,
+    simple_statfs,
+    simple_unlink,
 };
 use kernel::c_types::{
     c_int,
@@ -142,7 +152,7 @@ pub unsafe extern "C" fn ramfs_get_inode(sb: *mut super_block, dir: *const inode
                 inode.__bindgen_anon_3.i_fop = unsafe { &ramfs_file_operations };
             }
             S_IFDIR => {
-                inode.i_op = unsafe { &ramfs_dir_inode_operations };
+                inode.i_op = &ramfs_dir_inode_operations;
                 inode.__bindgen_anon_3.i_fop = unsafe { &simple_dir_operations };
 
                 /* directory inodes start off with i_nlink == 2 (for "." entry) */
@@ -226,7 +236,7 @@ impl Default for fs_parse_result {
  * represent C flags.
  */
 #[repr(C)]
-enum ramfs_param {
+pub enum ramfs_param {
     Opt_mode
 }
 
@@ -447,24 +457,44 @@ pub extern "C" fn ramfs_free_fc(fc: *mut fs_context)
     unsafe { Box::from_raw(fsi); }
 }
 
+// static in original C file
+static ramfs_dir_inode_operations: inode_operations = inode_operations {
+    create: Some(ramfs_create),
+    lookup: Some(simple_lookup),
+    link: Some(simple_link),
+    unlink: Some(simple_unlink),
+    symlink: Some(ramfs_symlink),
+    mkdir: Some(ramfs_mkdir),
+    rmdir: Some(simple_rmdir),
+    mknod: Some(ramfs_mknod),
+    rename: Some(simple_rename),
+    tmpfile: Some(ramfs_tmpfile),
+    ..c_default_struct!(inode_operations)
+};
+
+// static in original C file
+static ramfs_ops: super_operations = super_operations {
+    statfs: Some(simple_statfs),
+    drop_inode: Some(generic_delete_inode),
+    show_options: Some(ramfs_show_options),
+    ..c_default_struct!(super_operations)
+};
+
+// not static in original C file
+pub const ramfs_fs_parameters: [fs_parameter_spec; 2] = [
+    fsparam_u32oct!("mode", ramfs_param::Opt_mode),
+    c_default_struct!(fs_parameter_spec),
+];
+
+// static in original C file
 #[no_mangle]
-pub static mut ramfs_fs_type: file_system_type = file_system_type {
+static mut ramfs_fs_type: file_system_type = file_system_type {
     name: c_str!("ramfs").as_char_ptr(),
     init_fs_context: Some(ramfs_init_fs_context),
-    parameters: unsafe{ ramfs_fs_parameters.as_ptr() },
+    parameters: ramfs_fs_parameters.as_ptr(),
     kill_sb: Some(ramfs_kill_sb),
     fs_flags: RAMFS_RUST_FS_USERNS_MOUNT,
-    mount: None,
-    owner: ptr::null_mut(),
-    next: ptr::null_mut(),
-    fs_supers: hlist_head { first: ptr::null_mut() },
-    s_lock_key: lock_class_key {},
-    s_umount_key: lock_class_key {},
-    s_vfs_rename_key: lock_class_key {},
-    s_writers_key: [ lock_class_key {}; 3 ],
-    i_lock_key: lock_class_key {},
-    i_mutex_key: lock_class_key {},
-    i_mutex_dir_key: lock_class_key {},
+    ..c_default_struct!(file_system_type)
 };
 
 /* The original C source uses the '__init' macro (defined in include/linux/init.h)
@@ -496,8 +526,8 @@ pub extern "C" fn init_ramfs_fs() -> c_int
 
 #[no_mangle]
 #[allow(non_snake_case)]
-/// dummy function to make sure struct ramfs_mount_opts and ramfs_fs_info is exported
-pub extern "C" fn __dummy_rust__ramfs_fs_info(_dummy: ramfs_fs_info) {}
+/// dummy function to make sure struct ramfs_mount_opts and ramfs_fs_info is exported and ramfs_param
+pub extern "C" fn __dummy_rust__ramfs_fs_info(_dummy: ramfs_fs_info, _dummy_2: ramfs_param) {}
 
 #[repr(C)]
 struct fs_context_operations {
@@ -508,13 +538,10 @@ struct fs_context_operations {
 /// cbindgen:ignore
 extern "C" {
     static ramfs_context_ops: fs_context_operations;
-    static ramfs_fs_parameters: [fs_parameter_spec; 2];
-    static ramfs_file_operations: file_operations;
-    static ramfs_file_inode_operations: inode_operations;
-    static ramfs_dir_inode_operations: inode_operations;
-
     #[allow(improper_ctypes)]
-    static ramfs_ops: super_operations;
+    static ramfs_file_operations: file_operations;
+    #[allow(improper_ctypes)]
+    static ramfs_file_inode_operations: inode_operations;
 
     /* NOTE allow(improper_ctypes)
     something about vm_userfaultfd_ctx causing this to fail
