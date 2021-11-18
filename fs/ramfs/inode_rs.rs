@@ -17,6 +17,7 @@ use kernel::{
     c_str,
     fsparam_u32oct,
     c_default_struct,
+    seq_printf,
 };
 use kernel::bindings::{
     user_namespace,
@@ -391,11 +392,7 @@ pub extern "C" fn ramfs_show_options(m: *mut seq_file, root: *mut dentry) -> c_i
     let fsi = unsafe { (*sb).s_fs_info as *mut ramfs_fs_info };
     let mode = unsafe { (*fsi).mount_opts.mode };
     if mode != RAMFS_DEFAULT_MODE {
-        /* Invoke our C-wrapper for seq_printf().
-           (We're not exporting seq_printf() yet) */
-        unsafe {
-            ramfs_rust_seq_puts_mode(m, c_str!(",mode=%o").as_char_ptr(), mode);
-        }
+        seq_printf!(unsafe{ m.as_mut().unwrap() }, ",mode={:o}", mode);
     }
     0
 }
@@ -563,8 +560,6 @@ extern "C" {
     #[allow(improper_ctypes)]
     fn ramfs_rust_fs_context_set_s_fs_info(fc: *mut fs_context,
                                            fsi: *mut ramfs_fs_info);
-    #[allow(improper_ctypes)]
-    fn ramfs_rust_seq_puts_mode(m: *mut seq_file, string: *const c_char, mode: umode_t);
     #[allow(improper_ctypes)]
     fn ramfs_get_max_lfs_filesize() -> loff_t;
     #[allow(improper_ctypes)]

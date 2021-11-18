@@ -71,6 +71,7 @@ pub mod module_param;
 mod build_assert;
 pub mod prelude;
 pub mod print;
+pub mod seq_print;
 pub mod random;
 mod static_assert;
 #[doc(hidden)]
@@ -286,7 +287,7 @@ macro_rules! const_zeroed {
 ///     let change_one_copy = Test {
 ///         a: 11,
 ///         ..c_default_struct!(Test)
-///     }
+///     };
 /// }
 /// ```
 #[macro_export]

@@ -147,13 +147,4 @@ void ramfs_rust_fs_context_set_s_fs_info(struct fs_context *fc,
 	fc->s_fs_info = fsi;
 }
 
-/*
- * Presently, we're not exporting seq_printf(). For now use this simple wrapper
- * function to invoke seq_printf() with a single given char* and the mode value.
- */
-void ramfs_rust_seq_puts_mode(struct seq_file* m, const char* string, umode_t mode)
-{
-    seq_printf(m, string, mode);
-}
-
 fs_initcall(init_ramfs_fs);
