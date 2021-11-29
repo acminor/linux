@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0
 
-//! Files system.
+//! File system.
 //!
 //! C headers: [`include/linux/fs_parser.h`](../../../../include/linux/fs_parser.h) and
 //! [`include/linux/fs_parser.h`](../../../../include/linux/fs_parser.h)
+
+/// TODO: Unsure of the total implications of this
+/// - It behaved safely on the C side being sent to and fro
+/// - Rust might do some different compiler tricks on this (unsure)
+/// - This is necessary for Rust RamFS to have fs_parameter_spec info
+///   as a static
+/// - https://doc.rust-lang.org/nomicon/send-and-sync.html
+unsafe impl Sync for crate::bindings::fs_parameter_spec {}
 
 /// Corresponds to the __fsparam macro in C
 #[doc(hidden)]

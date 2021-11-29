@@ -11,7 +11,9 @@ use core::fmt;
 use crate::bindings;
 use crate::c_types::c_void;
 
+/// Contains format strings for seq_printf files
 pub mod format_strings {
+    /// Default format string for seq_printf files
     pub const FORMAT_STRING: &str = "%pA\0";
 }
 

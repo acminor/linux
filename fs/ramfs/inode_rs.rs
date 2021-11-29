@@ -115,6 +115,7 @@ mod __anon__ {
     struct fs_parameter;
     struct seq_file;
     struct file_system_type;
+    struct fs_parameter_spec;
 }
 
 #[repr(C)]
@@ -478,7 +479,8 @@ static ramfs_ops: super_operations = super_operations {
 };
 
 // not static in original C file
-pub const ramfs_fs_parameters: [fs_parameter_spec; 2] = [
+#[no_mangle]
+pub static ramfs_fs_parameters: [fs_parameter_spec; 2] = [
     fsparam_u32oct!("mode", ramfs_param::Opt_mode),
     c_default_struct!(fs_parameter_spec),
 ];
