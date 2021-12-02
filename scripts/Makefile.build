@@ -355,9 +355,6 @@ quiet_cmd_rustc_h_rs = CBINDGEN $(quiet_modtag) $@
 $(src)/%.h: $(src)/%.rs FORCE
 	$(call if_changed_dep,rustc_h_rs)
 
-#$(src)/%.h: $(src)/%.rs FORCE
-#	cbindgen --config scripts/cbindgen.toml --output $@ $<
-
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
