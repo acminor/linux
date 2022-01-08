@@ -382,6 +382,14 @@ source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 source "fs/unicode/Kconfig"
 
+if RUST
+menu "Rust Filesystems"
+
+source "fs/ramfs_rust/Kconfig"
+
+endmenu
+endif # RUST
+
 config IO_WQ
 	bool
 

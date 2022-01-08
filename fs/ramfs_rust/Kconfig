@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# UTF-8 normalization
+#
+config RAMFS_RUST
+	bool "Enabled building of the Rust version of RamFS in place of the C version"
+	help
+	  Say Y here to swap RamFS to use the Rust version instead of the C version.
+	default n

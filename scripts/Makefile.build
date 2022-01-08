@@ -346,13 +346,18 @@ $(obj)/%.o: $(src)/%.rs FORCE
 	$(call if_changed_dep,rustc_o_rs)
 
 # TODO find out cargo metadata output format for cbindgen to handle kernel:: crate
-# -- for now should still work
+# -- for now should still work with caveats as discussed in ramfs_rust implementation
+# -- we use sed to ignore warnings from cbindgen while allowing errors to pass through
+# -- this might want to have a config switch behind it, but unsure of the expectation
+# rm -f, necessary because cbindgen does not seem to update .h file in some circumstances
+# - this leads to repeated calls of CBINDGEN as it breaks the call if_changed infrastructure
 quiet_cmd_rustc_h_rs = CBINDGEN $(quiet_modtag) $@
       cmd_rustc_h_rs = \
-		  cbindgen --config scripts/cbindgen.toml --output $@ $<; \
+		  rm -f $@ && \
+		  cbindgen --config scripts/cbindgen.toml --output $@ $< 2>&1 | sed '/^WARN/d'; \
 		  echo "$@: $<" > $(depfile)
 
-$(src)/%.h: $(src)/%.rs FORCE
+$(obj)/%.h: $(src)/%.rs FORCE
 	$(call if_changed_dep,rustc_h_rs)
 
 # Compile assembler sources (.S)
